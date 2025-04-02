@@ -7,8 +7,9 @@ import Home from './routes/home/home.component';
 import Members from './routes/members/members.component';
 import Login from './routes/login/login.component';
 import Branches from './routes/branches/branches.component';
-import MemberAdd from './components/member-add/member-add.component';
+import MemberAdd from './components/member/member-add.component';
 import { onAuthStateChangedListener } from './utils/firebase/firebase.utils';
+import BranchAdd from './components/branches/branches-add.component';
 
 const ProtectedRoute = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -53,7 +54,8 @@ function App() {
           <Route path="home" element={<Home />} />
           <Route path="members" element={<Members />} />
           <Route path="add-member" element={<MemberAdd />} />
-          <Route path="branches" element={<Branches />} />
+          <Route path="branches" element={<Branches />} />  
+          <Route path="add-branch" element={<BranchAdd />} />
         </Route>
       </Routes>
     </QueryClientProvider>

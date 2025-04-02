@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 import { FormInput } from '../../components/form-input/form-input.component';   
 import { Button } from '../../components/button/button.component';
-import MemberList from '../../components/member-list/member-list.component';
+import MemberList from '../../components/member/member-list.component';
 
 const MemberContainer = styled.div`
     border : 1px solid black;

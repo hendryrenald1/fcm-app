@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styled from "styled-components";
 import { FormInput } from '../../components/form-input/form-input.component';
 import { Button } from '../../components/button/button.component';
@@ -29,12 +30,18 @@ const BranchListContainer = styled.div`
 `;
 
 const BranchesRoute = () => {
+    const navigate = useNavigate();
+
     const [searchQuery, setSearchQuery] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
     const handleSearch = (e) => {
         setSearchQuery(e.target.value);
         setCurrentPage(1); // Reset page to 1 when searching
+    };
+
+    const handleAddBranch = () => {
+        navigate('/add-branch');
     };
 
     return (
@@ -45,7 +52,7 @@ const BranchesRoute = () => {
                     value={searchQuery}
                     onChange={handleSearch}
                 />
-                <Button>Add Branch</Button>
+                <Button onClick={handleAddBranch}>Add Branch</Button>
             </BranchFilter>
             <BranchListContainer>
                 <Branches searchQuery={searchQuery} currentPage={currentPage} setCurrentPage={setCurrentPage} />

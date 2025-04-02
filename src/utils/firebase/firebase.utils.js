@@ -16,15 +16,14 @@ import {
   updateDoc
 } from 'firebase/firestore';
 
-
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBIY8xI9yG3rmivIsoiAnvNzOsXqIt1Mxw",
-  authDomain: "crwn-clothing-app-42312.firebaseapp.com",
-  projectId: "crwn-clothing-app-42312",
-  storageBucket: "crwn-clothing-app-42312.firebasestorage.app",
-  messagingSenderId: "781740667941",
-  appId: "1:781740667941:web:42243368471be340523bcc"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
@@ -200,3 +199,31 @@ export const fetchAllBranches = async () => {
     throw error;
   }
 };
+
+export const createBranch = async (branchData) => {
+  try {
+    const branchesRef = collection(db, 'branches');
+    const docRef = await addDoc(branchesRef, {
+      ...branchData,
+      createdAt: new Date()
+    });
+    return { id: docRef.id };
+  } catch (error) {
+    console.error('Error creating branch:', error);
+    throw error;
+  }
+};
+
+export const updateBranch = async (branchId, branchData) => {
+  try {
+    const branchRef = doc(db, 'branches', branchId);
+    await updateDoc(branchRef, {
+      ...branchData,
+      updatedAt: new Date()
+    });
+    return { id: branchId };
+  } catch (error) {
+    console.error('Error updating branch:', error);
+    throw error;
+  }
+};  
