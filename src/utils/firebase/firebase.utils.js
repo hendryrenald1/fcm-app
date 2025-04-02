@@ -15,6 +15,7 @@ import {
   doc,
   updateDoc
 } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -30,6 +31,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Firestore functions
 export const fetchMembers = async ({ pageSize = 10, page = 1, searchQuery = '' }) => {

@@ -4,7 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { FormInput } from '../form-input/form-input.component';
 import { Button } from '../button/button.component';
-import { createMember, updateMember, fetchAllBranches } from '../../utils/firebase/firebase.utils';
+import { createMember, updateMember, fetchAllBranches, storage } from '../../utils/firebase/firebase.utils';
+import { uploadBytes, getDownloadURL, ref } from 'firebase/storage';
 
 const FormContainer = styled.div`
   display: flex;
@@ -77,6 +78,11 @@ const MemberAdd = () => {
   const location = useLocation();
   const editMode = location.state?.member != null;
 
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [downloadURL, setDownloadURL] = useState("");
+  
+
   // Fetch branches for dropdown
   const { data: branches = [], isLoading: branchesLoading } = useQuery({
     queryKey: ['branches'],
@@ -122,6 +128,11 @@ const MemberAdd = () => {
 
       console.log('Formatted dates:', { formattedDateOfBirth, formattedJoinedOn });
 
+      // Set the downloadURL if the member has a physical form URL
+      if (member.physicalFormUrl) {
+        setDownloadURL(member.physicalFormUrl);
+      }
+
       setFormFields({
         ...member,
         dateOfBirth: formattedDateOfBirth,
@@ -155,10 +166,15 @@ const MemberAdd = () => {
     event.preventDefault();
 
     try {
+      const memberDataWithFile = {
+        ...formFields,
+        physicalFormUrl: downloadURL || null // Include the file URL in member data
+      };
+
       if (editMode) {
-        await updateMember(location.state.member.id, formFields);
+        await updateMember(location.state.member.id, memberDataWithFile);
       } else {
-        await createMember(formFields);
+        await createMember(memberDataWithFile);
       }
       navigate('/members');
     } catch (error) {
@@ -169,6 +185,30 @@ const MemberAdd = () => {
 
   const handleCancel = () => {
     navigate('/members');
+  };
+
+  const handleFileChange = (e) => {
+    if (e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!file) return;
+
+    setUploading(true);
+    const storageRef = ref(storage, `pdfs/${file.name}`); // Set the path
+
+    try {
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setDownloadURL(url);
+      alert("Upload successful!");
+    } catch (error) {
+      console.error("Upload failed:", error);
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -287,6 +327,11 @@ const MemberAdd = () => {
             ))}
           </Select>
         </SelectContainer>
+        <input type="file" accept="application/pdf" name="physicalForm" onChange={handleFileChange} />
+        <Button type="button" onClick={handleFileUpload} disabled={uploading}>
+            {uploading ? 'Uploading...' : 'Upload'}
+        </Button>
+        {downloadURL && <a href={downloadURL} target="_blank" rel="noopener noreferrer">Download</a>}
         <ButtonContainer>
           <Button type="submit">{editMode ? 'Update Member' : 'Add Member'}</Button>
           <Button type="button" onClick={handleCancel}>Cancel</Button>
