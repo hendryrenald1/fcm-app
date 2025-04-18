@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from 'react-router-dom';
 import {
   flexRender,
   getCoreRowModel,
@@ -6,7 +7,9 @@ import {
   useReactTable
 } from "@tanstack/react-table";
 import styled from "styled-components";
-import { fetchBranches } from "../../utils/firebase/firebase.utils";
+import { fetchBranchesWithPastors } from "../../utils/firebase/branch.utils";
+import { Button } from "../button/button.component";
+
 
 const TableContainer = styled.div`
   display: flex;
@@ -77,38 +80,53 @@ const PaginationButton = styled.button`
   }
 `;
 
-const columns = [
-  {
-    accessorKey: "name",
-    header: "Branch Name",
-  },
-  {
-    accessorKey: "city",
-    header: "City",
-  },
-  {
-    accessorKey: "pastorId",
-    header: "Pastor",
-  },
-  {
-    accessorKey: "manager",
-    header: "Manager",
-  }
-];
+
 
 export const Branches = ({ searchQuery, currentPage, setCurrentPage }) => {
+  const navigate = useNavigate();
   const pageSize = 10;
   const pageIndex = currentPage - 1;
 
-  const fetchDataOptions = {
-    pageSize,
-    page: currentPage,
-    searchQuery,
-  };
+  const columns = [
+    {
+      accessorKey: "name",
+      header: "Branch Name",
+    },
+    {
+      accessorKey: "city",
+      header: "City",
+    },
+    {
+      accessorKey: "pastorName",
+      header: "Pastor",
+      cell: ({ row }) => {
+        return row.original.pastorName || 'No Pastor Assigned';
+      }
+    },
+    {
+      accessorKey: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const branch = row.original;
+        return (
+          <Button
+            onClick={() => {
+              console.log('Editing branch:', branch);
+              navigate('/add-branch', { 
+                state: { branch: branch }
+              });
+            }}
+          >
+            ✏️ Edit
+          </Button>
+        );
+      }
+    }
+  ];
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["branches", fetchDataOptions],
-    queryFn: () => fetchBranches(fetchDataOptions),
+    queryKey: ["branches", currentPage, searchQuery],
+    queryFn: () => fetchBranchesWithPastors({ page: currentPage, pageSize, searchQuery }),
     placeholderData: (previousData) => previousData,
   });
 

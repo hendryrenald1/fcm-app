@@ -1,11 +1,13 @@
 import React from 'react';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createBranch, updateBranch } from '../../utils/firebase/firebase.utils';
+import { fetchMemberById } from '../../utils/firebase/member.utils';
 import styled from 'styled-components';
 import { Button } from '../button/button.component';
 import { FormInput } from '../form-input/form-input.component';
+import MemberSearchModal from '../member-search-modal/member-search-modal.component';
 
 
 const FormContainer = styled.div`
@@ -52,12 +54,52 @@ const defaultFormFields = {
   pastorId: ''
 };
 
+const PastorFieldContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  grid-column: span 2;
+  margin-bottom: 10px;
+`;
+
+const PastorInfoContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  font-size: 16px;
+  color: #333;
+  flex: 1;
+`;
+
+const PastorLabel = styled.div`
+  font-weight: bold;
+  margin-right: 10px;
+  min-width: 120px;
+`;
+
+const EllipsisButton = styled.button`
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: bold;
+  
+  &:hover {
+    background: #45a049;
+  }
+`;
+
 
 const BranchAdd = () => {
     const [formFields, setFormFields] = useState(defaultFormFields);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedPastor, setSelectedPastor] = useState(null);
     const navigate = useNavigate();
     const location = useLocation();
     const editMode = location.state?.branch != null;
+    console.log('Edit mode:', editMode);
+    console.log('Branch data:', location.state?.branch);
 
     const {
         name,
@@ -71,6 +113,38 @@ const BranchAdd = () => {
         pastorId
       } = formFields;
 
+      useEffect(() => {
+        if (editMode && location.state?.branch) {
+          const branch = location.state.branch;
+          setFormFields({
+            name: branch.name,
+            contactNumber: branch.contactNumber,
+            addressLine1: branch.addressLine1,
+            addressLine2: branch.addressLine2,
+            county: branch.county,
+            city: branch.city,
+            postCode: branch.postCode,
+            country: branch.country,
+            pastorId: branch.pastorId
+          });
+          
+          // If there's a pastorId, fetch the pastor details
+          if (branch.pastorId) {
+            fetchPastorDetails(branch.pastorId);
+          }
+        }
+      }, [editMode, location.state?.branch]);
+      
+      const fetchPastorDetails = async (pastorId) => {
+        try {
+          const pastor = await fetchMemberById(pastorId);
+          if (pastor) {
+            setSelectedPastor(pastor);
+          }
+        } catch (error) {
+          console.error('Error fetching pastor details:', error);
+        }
+      };
 
       const handleChange = (event) => {
         const { name, value } = event.target;
@@ -81,8 +155,21 @@ const BranchAdd = () => {
         event.preventDefault();
 
         try {
+          // Remove undefined or empty string values for update operation
           if (editMode) {
-            await updateBranch(location.state.branch.id, formFields);
+            // Create a clean object without undefined or empty values
+            const cleanedFields = {};
+            
+            // Loop through all fields and only include non-empty values
+            Object.keys(formFields).forEach(key => {
+              // Include the field if it's not undefined and not an empty string
+              if (formFields[key] !== undefined && formFields[key] !== '') {
+                cleanedFields[key] = formFields[key];
+              }
+            });
+            
+            console.log('Cleaned fields for update:', cleanedFields);
+            await updateBranch(location.state.branch.id, cleanedFields);
           } else {
             await createBranch(formFields);
           }
@@ -116,13 +203,35 @@ const BranchAdd = () => {
             value={contactNumber}
             onChange={handleChange}
           />
-          <FormInput 
-            label="Pastor ID"
-            type="text"
-            required
+          {/* Hidden pastorId field */}
+          <input 
+            type="hidden"
             name="pastorId"
             value={pastorId}
-            onChange={handleChange}
+          />
+          
+          <PastorFieldContainer>
+            <PastorLabel>Pastor:</PastorLabel>
+            <PastorInfoContainer>
+              {selectedPastor ? (
+                <span>{selectedPastor.firstName} {selectedPastor.lastName}</span>
+              ) : (
+                <span style={{ color: '#666', fontStyle: 'italic' }}>No pastor selected</span>
+              )}
+            </PastorInfoContainer>
+            <EllipsisButton type="button" onClick={() => setIsModalOpen(true)}>...</EllipsisButton>
+          </PastorFieldContainer>
+          
+          <MemberSearchModal 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSelectMember={(member) => {
+              setSelectedPastor(member);
+              setFormFields({
+                ...formFields,
+                pastorId: member.id
+              });
+            }}
           />
             
           <FormInput
