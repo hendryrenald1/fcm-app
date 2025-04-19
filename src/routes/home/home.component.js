@@ -200,7 +200,7 @@ const Home = () => {
     // Load Google Maps API
     const { isLoaded: mapsApiLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: 'AIzaSyCxgL7vd4JnrRGBf9o9MAWHF5Q1b2qoMB4', // Hardcoded key for development
+        googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY, // Use environment variable for production
         language: 'en',
         region: 'GB'
     });
