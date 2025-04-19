@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { db } from '../../utils/firebase/firebase.utils';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import styled from "styled-components";
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
+import axios from 'axios';
 
 const HomeContainer = styled.div`
     display: flex;
@@ -21,14 +26,6 @@ const DashboardGrid = styled.div`
     }
 `;
 
-const PageTitle = styled.h1`
-    font-size: 24px;
-    font-weight: 600;
-    color: #333;
-    margin: 0 0 24px 0;
-`;
-
-
 const Card = styled.div`
     background: white;
     border-radius: 12px;
@@ -37,6 +34,13 @@ const Card = styled.div`
     height: 100%;
     display: flex;
     flex-direction: column;
+`;
+
+const CardTitle = styled.h2`
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 20px 0;
 `;
 
 const StatsGrid = styled.div`
@@ -50,7 +54,9 @@ const StatsGrid = styled.div`
     }
 `;
 
-const StatCard = styled.div`
+const StatCard = styled.div.attrs(props => ({
+    'data-bg-gradient': props.bgGradient || 'rgba(123, 42, 138, 0.05)'
+}))`
     background: white;
     border-radius: 12px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
@@ -65,7 +71,7 @@ const StatCard = styled.div`
         right: 0;
         width: 30%;
         height: 100%;
-        background: ${props => props.bgGradient || 'rgba(123, 42, 138, 0.05)'};
+        background: ${props => props['data-bg-gradient']};
         border-radius: 0 12px 12px 0;
         z-index: 0;
     }
@@ -94,89 +100,9 @@ const StatValue = styled.div`
 const MapContainer = styled.div`
     position: relative;
     width: 100%;
-    height: 500px;
-    background-color: #f5f5f5;
-    border-radius: 12px;
-    overflow: hidden;
-`;
-
-const Map = styled.div`
-    width: 100%;
-    height: 100%;
-    background-color: #f0f8ff;
-    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgNTAwIj48cGF0aCBmaWxsPSIjZTBlMGUwIiBkPSJNMTYzLDM5N2wtMTMsLTMzbC0yMCwtOGwtMTcsLTI3bC0xNCwtNWwtMTAsLTI0bC0xNiwtMTBsLTEwLC0yMmwxLC0xOGwtMTQsLTI4bDksLTMwbC0yLC0yMGwtMTEsLTE0bDcsLTIxbC0xMCwtMjVsMTQsLTEybC0xLC0yNWwxMCwtMTRsMTQsLTNsMTAsLTI2bDIxLC0xbDEwLC0xMmwxNSw3bDIxLC0xM2wxMCwxMGwxOCw0bDI0LC0xNGwxNCwxMGwzMCwtMTFsMTEsMTBsMjEsLTEzbDE0LDEwbDIwLC0xbDEwLC0xMmwxOCw0bDEwLC0xMmwxOCw0bDEwLDIybDIxLC0xbDEwLDEwbC0xLDI1bC0xMCwxNGwtMTQsM2wtMTAsMTRsLTIwLDFsLTEwLDEybC0xNSwtN2wtMTAsMTJsLTIwLDFsLTEwLDI2bC0yNSwxNGwtMTAsLTEwbC0xOCwtNGwtMTAsMTJsLTIxLDEzbC0xMCwtMTBsLTE4LC00bC0xMCwxMmwtMTQsM2wtMTAsMjZsLTIxLC0xbC0xMCwxMmwtMTUsLTdsMSwzN2wtMTAsMTRsLTE0LDNsLTEwLDI2bC0yMCwxbC0xMCwxMmwtMTUsLTdsMSwyNWwtMTAsMTRaIi8+PC9zdmc+');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    position: relative;
-`;
-
-const MapMarker = styled.div`
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    background-color: ${props => props.color || '#7B2A8A'};
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 0 4px rgba(123, 42, 138, 0.2);
-    cursor: pointer;
-    
-    &:hover {
-        transform: translate(-50%, -50%) scale(1.2);
-    }
-    
-    &::after {
-        content: '';
-        position: absolute;
-        bottom: -8px;
-        left: 50%;
-        transform: translateX(-50%);
-        border-left: 6px solid transparent;
-        border-right: 6px solid transparent;
-        border-top: 8px solid ${props => props.color || '#7B2A8A'};
-    }
-`;
-
-const MapTooltip = styled.div`
-    position: absolute;
-    background: white;
+    height: 400px;
     border-radius: 8px;
-    padding: 12px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    min-width: 200px;
-    z-index: 10;
-    top: ${props => props.top}px;
-    left: ${props => props.left}px;
-    transform: translate(-50%, -130%);
-    
-    &::after {
-        content: '';
-        position: absolute;
-        bottom: -8px;
-        left: 50%;
-        transform: translateX(-50%);
-        border-left: 8px solid transparent;
-        border-right: 8px solid transparent;
-        border-top: 8px solid white;
-    }
-`;
-
-const TooltipTitle = styled.div`
-    font-size: 16px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 4px;
-`;
-
-const TooltipLocation = styled.div`
-    font-size: 14px;
-    color: #666;
-    margin-bottom: 8px;
-`;
-
-const TooltipContact = styled.div`
-    font-size: 12px;
-    color: #7B2A8A;
+    overflow: hidden;
 `;
 
 const TableContainer = styled.div`
@@ -188,111 +114,253 @@ const Table = styled.table`
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
+    font-size: 14px;
     
-    th, td {
-        padding: 12px 16px;
-        text-align: left;
+    thead {
+        background-color: #f5f5f5;
+        
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
+        }
     }
     
-    th {
-        background-color: #f8f8f8;
-        font-weight: 600;
-        color: #333;
-        font-size: 14px;
-        border-bottom: 1px solid #eee;
-    }
-    
-    td {
-        border-bottom: 1px solid #eee;
-        color: #444;
-        font-size: 14px;
-    }
-    
-    tr:last-child td {
-        border-bottom: none;
-    }
-    
-    tr:hover td {
-        background-color: #f9f7ff;
+    tbody {
+        tr {
+            &:hover {
+                background-color: #f9f0ff;
+            }
+        }
+        
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
     }
 `;
 
-const CardTitle = styled.h3`
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
-    margin: 0 0 16px 0;
-`;
-
-
-
-
-// Icons for the stats cards
 const BranchIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 3V15" stroke="#7B2A8A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M18 9C19.6569 9 21 7.65685 21 6C21 4.34315 19.6569 3 18 3C16.3431 3 15 4.34315 15 6C15 7.65685 16.3431 9 18 9Z" stroke="#7B2A8A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M6 21C7.65685 21 9 19.6569 9 18C9 16.3431 7.65685 15 6 15C4.34315 15 3 16.3431 3 18C3 19.6569 4.34315 21 6 21Z" stroke="#7B2A8A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M18 9C18 11.3869 17.0518 13.6761 15.364 15.364C13.6761 17.0518 11.3869 18 9 18" stroke="#7B2A8A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 3C13 2.44772 12.5523 2 12 2C11.4477 2 11 2.44772 11 3V13.5858L7.70711 10.2929C7.31658 9.90237 6.68342 9.90237 6.29289 10.2929C5.90237 10.6834 5.90237 11.3166 6.29289 11.7071L11.2929 16.7071C11.6834 17.0976 12.3166 17.0976 12.7071 16.7071L17.7071 11.7071C18.0976 11.3166 18.0976 10.6834 17.7071 10.2929C17.3166 9.90237 16.6834 9.90237 16.2929 10.2929L13 13.5858V3Z" fill="#6a26cd"/>
+        <path d="M4 15C4 14.4477 3.55228 14 3 14C2.44772 14 2 14.4477 2 15V20C2 21.1046 2.89543 22 4 22H20C21.1046 22 22 21.1046 22 20V15C22 14.4477 21.5523 14 21 14C20.4477 14 20 14.4477 20 15V20H4V15Z" fill="#6a26cd"/>
     </svg>
 );
 
 const MembersIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="#F97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z" fill="#f97316"/>
+        <path d="M9 13C5.13401 13 2 16.134 2 20V21H16V20C16 16.134 12.866 13 9 13Z" fill="#f97316"/>
+        <path d="M19.9999 8H21.9999V10H19.9999V12H17.9999V10H15.9999V8H17.9999V6H19.9999V8Z" fill="#f97316"/>
     </svg>
 );
 
+// Google Maps container styles
+const mapContainerStyle = {
+    width: '100%',
+    height: '100%',
+    borderRadius: '8px'
+};
+
+// Default center (UK)
+const defaultCenter = {
+    lat: 54.093409,
+    lng: -2.89479
+};
+
+// Map options
+const mapOptions = {
+    disableDefaultUI: true,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    styles: [
+        {
+            featureType: 'poi',
+            elementType: 'labels',
+            stylers: [{ visibility: 'off' }]
+        }
+    ]
+};
+
 const BaptisedIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M12 16V12" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d="M12 8H12.01" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" fill="#3b82f6"/>
     </svg>
 );
 
 const Home = () => {
     const [selectedBranch, setSelectedBranch] = useState(null);
-    const [mapLoaded, setMapLoaded] = useState(false);
+    const [branchLocations, setBranchLocations] = useState([]);
+    const [mapCenter, setMapCenter] = useState(defaultCenter);
+    const [mapZoom, setMapZoom] = useState(7); // Default zoom level for UK
     
+    // Load Google Maps API
+    const { isLoaded: mapsApiLoaded } = useJsApiLoader({
+        id: 'google-map-script',
+        googleMapsApiKey: 'AIzaSyCxgL7vd4JnrRGBf9o9MAWHF5Q1b2qoMB4', // Hardcoded key for development
+        language: 'en',
+        region: 'GB'
+    });
+    
+    // Fetch all branches
+    const { data: branchesData = [], isLoading: branchesLoading } = useQuery({
+        queryKey: ['branches'],
+        queryFn: async () => {
+            const branchesRef = collection(db, 'branches');
+            const branchesSnapshot = await getDocs(query(branchesRef, orderBy('name', 'asc')));
+            const branches = branchesSnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    members: 0,
+                    baptised: 0,
+                    // Keep postcode for geocoding
+                    postCode: data.postCode || ''
+                };
+            });
+            return branches;
+        }
+    });
+    
+    // Fetch all members to count by branch
+    const { data: membersData = [], isLoading: membersLoading } = useQuery({
+        queryKey: ['members-count'],
+        queryFn: async () => {
+            const membersRef = collection(db, 'members');
+            const membersSnapshot = await getDocs(membersRef);
+            return membersSnapshot.docs.map(doc => ({
+                id: doc.id,
+                branchId: doc.data().branchId,
+                baptised: doc.data().baptised || false
+            }));
+        },
+        enabled: branchesData.length > 0
+    });
+    
+    // Process branches with member counts
+    const branches = useMemo(() => {
+        if (branchesLoading || membersLoading) return [];
+        
+        // Create a map of branch counts
+        const branchCounts = {};
+        
+        // Initialize counts for all branches
+        branchesData.forEach(branch => {
+            branchCounts[branch.id] = { members: 0, baptised: 0 };
+        });
+        
+        // Count members per branch
+        membersData.forEach(member => {
+            if (member.branchId && branchCounts[member.branchId]) {
+                branchCounts[member.branchId].members++;
+                if (member.baptised) {
+                    branchCounts[member.branchId].baptised++;
+                }
+            }
+        });
+        
+        // Merge counts with branch data
+        return branchesData.map(branch => ({
+            ...branch,
+            members: branchCounts[branch.id]?.members || 0,
+            baptised: branchCounts[branch.id]?.baptised || 0,
+            contact: branch.phone || 'No contact info'
+        }));
+    }, [branchesData, membersData, branchesLoading, membersLoading]);
+    
+    // Geocode postcodes to get coordinates
     useEffect(() => {
-        // Set map as loaded after component mounts
-        setMapLoaded(true);
-    }, []);
-    
-    // Sample branch data
-    const branches = [
-        { id: 1, name: 'Surbiton Faith Church', location: 'Surbiton', members: 265, baptised: 198, position: { top: 70, left: 40 }, contact: '01632 960123' },
-        { id: 2, name: 'Elmfield Church', location: 'Wembley', members: 300, baptised: 250, position: { top: 65, left: 45 }, contact: '01632 960124' },
-        { id: 3, name: 'Liverpool Faith Church', location: 'Liverpool', members: 562, baptised: 489, position: { top: 40, left: 30 }, contact: '01632 960125' },
-        { id: 4, name: 'North Evington Free Church', location: 'Leicester', members: 450, baptised: 320, position: { top: 50, left: 40 }, contact: '01632 960233' },
-        { id: 5, name: 'St Lukes Church', location: 'Manchester', members: 723, baptised: 592, position: { top: 35, left: 35 }, contact: '01632 960126' },
-        { id: 6, name: 'Stanton Road Baptist Church', location: 'Luton', members: 345, baptised: 289, position: { top: 60, left: 50 }, contact: '01632 960127' },
-        { id: 7, name: 'East Ham Faith Church', location: 'East Ham', members: 652, baptised: 490, position: { top: 65, left: 55 }, contact: '01632 960128' },
-        { id: 8, name: 'Elmfield Church', location: 'Wembley', members: 300, baptised: 250, position: { top: 65, left: 45 }, contact: '01632 960129' },
-        { id: 9, name: 'Liverpool Faith Church', location: 'Liverpool', members: 450, baptised: 320, position: { top: 40, left: 30 }, contact: '01632 960130' },
-        { id: 10, name: 'St Lukes Church', location: 'Manchester', members: 723, baptised: 592, position: { top: 35, left: 35 }, contact: '01632 960131' },
-    ];
+        const geocodeBranches = async () => {
+            if (!branches.length) return;
+            
+            const branchesWithCoordinates = [];
+            
+            for (const branch of branches) {
+                if (!branch.postCode) continue;
+                
+                try {
+                    // Use a geocoding service to convert postcode to coordinates
+                    // Note: In a production app, you should use a proper geocoding service with your API key
+                    const response = await axios.get(
+                        `https://api.postcodes.io/postcodes/${encodeURIComponent(branch.postCode)}`
+                    );
+                    
+                    if (response.data && response.data.result) {
+                        const { latitude, longitude } = response.data.result;
+                        
+                        branchesWithCoordinates.push({
+                            ...branch,
+                            position: {
+                                lat: latitude,
+                                lng: longitude
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error geocoding ${branch.name}:`, error);
+                    // Add branch without coordinates
+                    branchesWithCoordinates.push(branch);
+                }
+            }
+            
+            setBranchLocations(branchesWithCoordinates);
+            
+            // If we have locations, center the map on the first one
+            if (branchesWithCoordinates.length > 0 && branchesWithCoordinates[0].position) {
+                setMapCenter(branchesWithCoordinates[0].position);
+            }
+        };
+        
+        geocodeBranches();
+    }, [branches]);
     
     // Calculate totals
     const totalBranches = branches.length;
     const totalMembers = branches.reduce((sum, branch) => sum + branch.members, 0);
     const totalBaptised = branches.reduce((sum, branch) => sum + branch.baptised, 0);
     
-    const handleMarkerClick = (branch) => {
+    // Handle marker click
+    const handleMarkerClick = useCallback((branch) => {
         setSelectedBranch(branch);
-    };
-    
-    const handleMapClick = (e) => {
-        // Close tooltip when clicking elsewhere on the map
-        if (e.target === e.currentTarget) {
-            setSelectedBranch(null);
+        if (branch.position) {
+            setMapCenter(branch.position);
+            setMapZoom(14); // Zoom in when a branch is selected
         }
-    };
+    }, []);
     
+    // Close info window
+    const handleInfoWindowClose = useCallback(() => {
+        setSelectedBranch(null);
+        setMapZoom(6); // Zoom out when info window is closed
+    }, []);
+    
+    // Map reference
+    const [map, setMap] = useState(null);
+    const mapRef = useRef(null);
+    
+    const onMapLoad = useCallback((map) => {
+        setMap(map);
+    }, []);
+    
+    const onMapClick = useCallback(() => {
+        setSelectedBranch(null);
+        setMapZoom(6); // Reset zoom when clicking on the map
+    }, []);
+    
+    // Clean up map instance on unmount
+    useEffect(() => {
+        return () => {
+            if (map) {
+                // Clean up map instance
+                setMap(null);
+            }
+        };
+    }, [map]);
+
     return (
         <HomeContainer>
             <StatsGrid>
@@ -315,30 +383,53 @@ const Home = () => {
             <DashboardGrid>
                 <Card>
                     <CardTitle>Branch Locations</CardTitle>
-                    <MapContainer>
-                        <Map onClick={handleMapClick}>
-                            {branches.map(branch => (
-                                <MapMarker 
-                                    key={branch.id}
-                                    style={{
-                                        top: `${branch.position.top}%`,
-                                        left: `${branch.position.left}%`
-                                    }}
-                                    onClick={() => handleMarkerClick(branch)}
-                                />
-                            ))}
-                            
-                            {selectedBranch && (
-                                <MapTooltip 
-                                    top={selectedBranch.position.top} 
-                                    left={selectedBranch.position.left}
-                                >
-                                    <TooltipTitle>{selectedBranch.name}</TooltipTitle>
-                                    <TooltipLocation>{selectedBranch.location}</TooltipLocation>
-                                    <TooltipContact>Contact: {selectedBranch.contact}</TooltipContact>
-                                </MapTooltip>
-                            )}
-                        </Map>
+                    <MapContainer ref={mapRef}>
+                        {mapsApiLoaded ? (
+                            <GoogleMap
+                                mapContainerStyle={mapContainerStyle}
+                                center={mapCenter}
+                                zoom={mapZoom}
+                                options={mapOptions}
+                                onLoad={onMapLoad}
+                                onClick={onMapClick}
+                                mapContainerClassName="google-map-container"
+                            >
+                                {branchLocations.map(branch => {
+                                    // Only render markers for branches with coordinates
+                                    if (!branch.position || !branch.position.lat) return null;
+                                    
+                                    return (
+                                        <Marker
+                                            key={branch.id}
+                                            position={branch.position}
+                                            onClick={() => handleMarkerClick(branch)}
+                                            icon={{
+                                                url: 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png'
+                                            }}
+                                        />
+                                    );
+                                })}
+                                
+                                {selectedBranch && selectedBranch.position && (
+                                    <InfoWindow
+                                        position={selectedBranch.position}
+                                        onCloseClick={handleInfoWindowClose}
+                                    >
+                                        <div>
+                                            <h3 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>{selectedBranch.name}</h3>
+                                            <p style={{ margin: '0 0 3px 0', fontSize: '14px' }}>{selectedBranch.city || selectedBranch.location}</p>
+                                            <p style={{ margin: '0 0 3px 0', fontSize: '14px' }}>Members: {selectedBranch.members}</p>
+                                            <p style={{ margin: '0', fontSize: '14px' }}>Baptised: {selectedBranch.baptised}</p>
+                                            <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>Contact: {selectedBranch.contact}</p>
+                                        </div>
+                                    </InfoWindow>
+                                )}
+                            </GoogleMap>
+                        ) : (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                Loading Google Maps...
+                            </div>
+                        )}
                     </MapContainer>
                 </Card>
                 

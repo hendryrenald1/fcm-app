@@ -3,8 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import styled from 'styled-components';
 import { Button } from '../button/button.component';
+import { FormInput } from '../form-input/form-input.component';
 import { createMember, updateMember, fetchAllBranches, storage } from '../../utils/firebase/firebase.utils';
-import { uploadBytes, getDownloadURL, ref } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const PageContainer = styled.div`
   display: flex;
@@ -12,6 +13,7 @@ const PageContainer = styled.div`
   width: 100%;
   padding: 20px;
   background: #f9f0ff;
+  min-height: 100vh;
 `;
 
 const BackButton = styled.button`
@@ -43,27 +45,74 @@ const FormContainer = styled.div`
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
 `;
 
+const PageTitle = styled.h1`
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 24px;
+`;
+
 const SectionTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
   color: #333;
-  margin-bottom: 20px;
-  margin-top: 30px;
-  
-  &:first-of-type {
-    margin-top: 0;
-  }
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eee;
 `;
 
 const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+`;
+
+const FormSection = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
 `;
 
+const FormRow = styled.div`
+  grid-column: ${props => props.fullWidth ? '1 / -1' : 'span 1'};
+`;
+
+const ProgressBar = styled.div`
+  width: 100%;
+  height: 4px;
+  background-color: #eee;
+  border-radius: 4px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+`;
+
+const SelectGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+`;
+
+const SelectLabel = styled.label`
+  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  
+  ${props => props.required && `
+    &::after {
+      content: '*';
+      color: #e53e3e;
+      margin-left: 4px;
+    }
+  `}
+`;
+
 const Select = styled.select`
   height: 48px;
-  padding: 0 12px;
+  padding: 0 16px;
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 16px;
@@ -71,34 +120,10 @@ const Select = styled.select`
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 16px center;
   background-size: 16px;
-  
-  &:focus {
-    outline: none;
-    border-color: #6a26cd;
-    box-shadow: 0 0 0 2px rgba(106, 38, 205, 0.1);
-  }
-`;
-
-const FieldLabel = styled.div`
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 8px;
-`;
-
-const InputGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const Input = styled.input`
-  height: 48px;
-  padding: 0 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 16px;
+  width: 100%;
+  transition: all 0.2s ease;
   
   &:focus {
     outline: none;
@@ -111,68 +136,19 @@ const Input = styled.input`
   }
 `;
 
-const DocumentUploadContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 200px;
-  height: 120px;
-  border: 1px dashed #ccc;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 10px;
-  overflow: hidden;
-  position: relative;
-  
-  &:hover {
-    border-color: #6a26cd;
-    background-color: rgba(106, 38, 205, 0.03);
-  }
-`;
+// FormSelect component to match FormInput style
+const FormSelect = ({ label, required, children, ...otherProps }) => (
+  <SelectGroup>
+    {label && (
+      <SelectLabel required={required}>{label}</SelectLabel>
+    )}
+    <Select required={required} {...otherProps}>
+      {children}
+    </Select>
+  </SelectGroup>
+);
 
-const DocumentPreview = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background-color: #f8f8f8;
-  
-  svg {
-    width: 40px;
-    height: 40px;
-    margin-bottom: 8px;
-    color: #6a26cd;
-  }
-  
-  span {
-    font-size: 12px;
-    color: #333;
-    text-align: center;
-  }
-`;
 
-const UploadIcon = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #666;
-  font-size: 14px;
-  
-  svg {
-    margin-bottom: 8px;
-    color: #6a26cd;
-  }
-`;
-
-const UploadText = styled.div`
-  font-size: 12px;
-  color: #666;
-  text-align: center;
-  margin-top: 8px;
-`;
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -213,18 +189,37 @@ const CloseButton = styled.button`
   }
 `;
 
-const DocumentFrame = styled.iframe`
-  width: 800px;
-  height: 600px;
-  border: none;
+const ModalMessage = styled.div`
+  text-align: center;
+  margin: 20px 0;
+  font-size: 16px;
+  color: #333;
+`;
+
+const DocumentViewButton = styled.a`
+  display: inline-block;
+  margin-top: 15px;
+  padding: 12px 24px;
+  background-color: #6a26cd;
+  color: white;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  font-size: 16px;
+  
+  &:hover {
+    background-color: #5a20b0;
+  }
 `;
 
 const ButtonContainer = styled.div`
-  grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
   gap: 16px;
-  margin-top: 40px;
+  margin-top: 16px;
+  padding-top: 24px;
+  border-top: 1px solid #eee;
 `;
 
 // Arrow icon for back button
@@ -266,25 +261,179 @@ const defaultFormFields = {
   country: '',
   branchId: '',
   email: '',
-  dateOfBirth: '',
   phone: '',
-  joinedOn: new Date().toISOString().split('T')[0]
+  joinedOn: '',
+  dateOfBirth: '',
+  baptised: false,
+  physicalFormUrl: ''
 };
 
+const ProgressBarInner = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: ${props => props.progress}%;
+  background-color: #6a26cd;
+  transition: width 0.3s ease;
+`;
+
+const UploadContainer = styled.div`
+  margin-bottom: 20px;
+`;
+
+const UploadLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  background-color: #f9fafb;
+  color: #666;
+  transition: all 0.2s;
+  
+  &:hover {
+    border-color: #6a26cd;
+    color: #6a26cd;
+    background-color: rgba(106, 38, 205, 0.05);
+  }
+  
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+`;
+
+const UploadInput = styled.input`
+  display: none;
+`;
+
+const SelectedFilesContainer = styled.div`
+  margin-top: 16px;
+`;
+
+const SelectedFilesTitle = styled.div`
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+`;
+
+const ExistingDocumentsContainer = styled.div`
+  margin-top: 24px;
+`;
+
+const ExistingDocumentsTitle = styled.div`
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+`;
+
+const FileList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const FileItem = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #eee;
+`;
+
+const FileName = styled.div`
+  font-size: 14px;
+  color: #333;
+`;
+
+const RemoveFileButton = styled.button`
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: #fee2e2;
+    color: #ef4444;
+  }
+`;
+
+const DocumentActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const ViewDocumentButton = styled.button`
+  background: none;
+  border: none;
+  color: #6a26cd;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: rgba(106, 38, 205, 0.1);
+  }
+  
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
+const CheckboxContainer = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 8px 0;
+`;
+
+const Checkbox = styled.input`
+  width: 18px;
+  height: 18px;
+  accent-color: #6a26cd;
+`;
+
+const CheckboxLabel = styled.span`
+  font-size: 16px;
+  color: #333;
+`;
+
+
+
 const MemberAdd = () => {
-  const [formFields, setFormFields] = useState(defaultFormFields);
   const navigate = useNavigate();
   const location = useLocation();
   const editMode = location.state?.member != null;
+  const [formFields, setFormFields] = useState(defaultFormFields);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [previewUrl, setPreviewUrl] = useState([]);
+  const [previewDocumentName, setPreviewDocumentName] = useState([]);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [formProgress, setFormProgress] = useState(0);
 
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [downloadURL, setDownloadURL] = useState("");
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  
-
-  // Fetch branches for dropdown
-  const { data: branches = [], isLoading: branchesLoading } = useQuery({
+  const { data: branches = [] } = useQuery({
     queryKey: ['branches'],
     queryFn: fetchAllBranches
   });
@@ -292,89 +441,144 @@ const MemberAdd = () => {
   useEffect(() => {
     if (editMode && location.state?.member) {
       const member = location.state.member;
-      console.log('Member data:', member);
-      console.log('dateOfBirth:', member.dateOfBirth);
-      console.log('joinedOn:', member.joinedOn);
-
-      // Convert Firestore Timestamp to Date string in YYYY-MM-DD format
-      const formatFirestoreDate = (timestamp) => {
-        if (!timestamp) return '';
-        try {
-          // If it's a Firestore timestamp
-          if (timestamp.toDate) {
-            return timestamp.toDate().toISOString().split('T')[0];
-          }
-          // If it's a Date object
-          if (timestamp instanceof Date) {
-            return timestamp.toISOString().split('T')[0];
-          }
-          // If it's already in YYYY-MM-DD format
-          if (typeof timestamp === 'string' && timestamp.match(/^\d{4}-\d{2}-\d{2}$/)) {
-            return timestamp;
-          }
-          // If it's a number (timestamp)
-          if (typeof timestamp === 'number') {
-            return new Date(timestamp).toISOString().split('T')[0];
-          }
-          return '';
-        } catch (error) {
-          console.error('Error formatting date:', timestamp, error);
-          return '';
-        }
-      };
-
-      const formattedDateOfBirth = formatFirestoreDate(member.dateOfBirth);
-      const formattedJoinedOn = formatFirestoreDate(member.joinedOn);
-
-      console.log('Formatted dates:', { formattedDateOfBirth, formattedJoinedOn });
-
-      // Set the downloadURL if the member has a physical form URL
-      if (member.physicalFormUrl) {
-        setDownloadURL(member.physicalFormUrl);
+      // Format the joinedOn date for the date input (YYYY-MM-DD format)
+      let formattedJoinedOn = '';
+      if (member.joinedOn) {
+        // If it's a Firestore timestamp, convert to JS Date
+        const joinedDate = member.joinedOn.toDate ? member.joinedOn.toDate() : new Date(member.joinedOn);
+        // Format as YYYY-MM-DD for the date input
+        formattedJoinedOn = joinedDate.toISOString().split('T')[0];
       }
-
+      
+      // Format the dateOfBirth for the date input (YYYY-MM-DD format)
+      let formattedDateOfBirth = '';
+      if (member.dateOfBirth) {
+        // If it's a Firestore timestamp, convert to JS Date
+        const birthDate = member.dateOfBirth.toDate ? member.dateOfBirth.toDate() : new Date(member.dateOfBirth);
+        // Format as YYYY-MM-DD for the date input
+        formattedDateOfBirth = birthDate.toISOString().split('T')[0];
+      }
+      
       setFormFields({
-        ...member,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.email,
+        phone: member.phone || '',
+        addressLine1: member.addressLine1,
+        addressLine2: member.addressLine2 || '',
+        city: member.city,
+        county: member.county || '',
+        postalCode: member.postalCode,
+        country: member.country,
+        branchId: member.branchId,
+        joinedOn: formattedJoinedOn,
         dateOfBirth: formattedDateOfBirth,
-        joinedOn: formattedJoinedOn
+        baptised: member.baptised || false,
+        physicalFormUrl: member.physicalFormUrl || ''
       });
+      
+      // Set form progress to 100% in edit mode
+      setFormProgress(100);
     }
   }, [editMode, location.state?.member]);
-
-  const {
-    firstName,
-    lastName,
-    addressLine1,
-    addressLine2,
-    county,
-    city,
-    postalCode,
-    country,
-    email,
-    dateOfBirth,
-    branchId,
-    phone,
-    joinedOn
-  } = formFields;
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormFields({ ...formFields, [name]: value });
+    
+    // Calculate form progress
+    const requiredFields = ['firstName', 'lastName', 'email', 'addressLine1', 'city', 'postalCode', 'country', 'branchId'];
+    const filledRequiredFields = requiredFields.filter(field => formFields[field] || (name === field && value));
+    const progress = Math.round((filledRequiredFields.length / requiredFields.length) * 100);
+    setFormProgress(progress);
+  };
+
+  const handleCheckboxChange = (event) => {
+    const { name, checked } = event.target;
+    setFormFields({ ...formFields, [name]: checked });
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     try {
-      const memberDataWithFile = {
-        ...formFields,
-        physicalFormUrl: downloadURL || null // Include the file URL in member data
-      };
+      // Process the joinedOn date if it exists
+      let processedFormFields = { ...formFields };
+      
+      // Process joinedOn date
+      if (processedFormFields.joinedOn && processedFormFields.joinedOn.trim() !== '') {
+        try {
+          // Convert the string date to a JavaScript Date object
+          const dateObj = new Date(processedFormFields.joinedOn);
+          
+          // Check if date is valid before assigning
+          if (!isNaN(dateObj.getTime())) {
+            processedFormFields.joinedOn = dateObj;
+          } else {
+            // If invalid, remove the joinedOn field
+            delete processedFormFields.joinedOn;
+          }
+        } catch (error) {
+          console.error('Error parsing joinedOn date:', error);
+          // If there's an error, remove the joinedOn field
+          delete processedFormFields.joinedOn;
+        }
+      } else {
+        // If empty string or undefined, remove the field
+        delete processedFormFields.joinedOn;
+      }
+      
+      // Process dateOfBirth date
+      if (processedFormFields.dateOfBirth && processedFormFields.dateOfBirth.trim() !== '') {
+        try {
+          // Convert the string date to a JavaScript Date object
+          const dateObj = new Date(processedFormFields.dateOfBirth);
+          
+          // Check if date is valid before assigning
+          if (!isNaN(dateObj.getTime())) {
+            processedFormFields.dateOfBirth = dateObj;
+          } else {
+            // If invalid, remove the dateOfBirth field
+            delete processedFormFields.dateOfBirth;
+          }
+        } catch (error) {
+          console.error('Error parsing dateOfBirth:', error);
+          // If there's an error, remove the dateOfBirth field
+          delete processedFormFields.dateOfBirth;
+        }
+      } else {
+        // If empty string or undefined, remove the field
+        delete processedFormFields.dateOfBirth;
+      }
+      
+      let memberData = { ...processedFormFields };
+      
+      // Handle file upload to Firebase Storage if there's a new file
+      if (selectedFiles.length > 0) {
+        const file = selectedFiles[0];
+        const fileExtension = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+        // Use a storage path that the user has permission to access
+        const storageRef = ref(storage, `pdfs/${fileName}`);
+        
+        // Convert data URL to Blob
+        const response = await fetch(previewUrl[0]);
+        const blob = await response.blob();
+        
+        // Upload to Firebase Storage
+        const uploadResult = await uploadBytes(storageRef, blob);
+        
+        // Get the download URL
+        const downloadURL = await getDownloadURL(uploadResult.ref);
+        
+        // Set the URL in the member data
+        memberData.physicalFormUrl = downloadURL;
+      }
 
       if (editMode) {
-        await updateMember(location.state.member.id, memberDataWithFile);
+        await updateMember(location.state.member.id, memberData);
       } else {
-        await createMember(memberDataWithFile);
+        await createMember(memberData);
       }
       navigate('/members');
     } catch (error) {
@@ -383,322 +587,333 @@ const MemberAdd = () => {
     }
   };
 
-  const handleCancel = () => {
+  const handleBack = () => {
     navigate('/members');
   };
 
-  const handleFileChange = (e) => {
-    if (e.target.files[0]) {
-      setFile(e.target.files[0]);
+  const handleFileChange = (event) => {
+    // We only need one file for the physical form
+    const file = event.target.files[0];
+    if (file) {
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size exceeds 5MB limit. Please select a smaller file.');
+        return;
+      }
+      
+      setSelectedFiles([file]);
+      
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPreviewUrl([reader.result]);
+        setPreviewDocumentName([file.name]);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleFileUpload = async () => {
-    if (!file) return;
+  const handleRemoveFile = (index) => {
+    // Make sure we're working with arrays
+    const files = Array.isArray(selectedFiles) ? selectedFiles.slice() : [];
+    files.splice(index, 1);
+    setSelectedFiles(files);
     
-    setUploading(true);
-    try {
-      // Create a unique filename using timestamp and original name
-      const timestamp = new Date().getTime();
-      const fileName = `${timestamp}_${file.name}`;
-      const storageRef = ref(storage, `physicalForms/${fileName}`);
-      
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      setDownloadURL(url);
-      setFormFields({
-        ...formFields,
-        physicalFormUrl: url
-      });
-      
-      // Reset file state after successful upload
-      setFile(null);
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      alert("Failed to upload file. Please try again.");
-    } finally {
-      setUploading(false);
-    }
+    const previewUrls = Array.isArray(previewUrl) ? previewUrl.slice() : [];
+    previewUrls.splice(index, 1);
+    setPreviewUrl(previewUrls);
+    
+    const previewDocumentNames = Array.isArray(previewDocumentName) ? previewDocumentName.slice() : [];
+    previewDocumentNames.splice(index, 1);
+    setPreviewDocumentName(previewDocumentNames);
   };
-  
-  const openDocumentModal = () => {
-    if (downloadURL) {
-      setShowDocumentModal(true);
-    }
+
+  const handleViewDocument = (doc) => {
+    // Open directly in a new tab
+    window.open(doc.url, '_blank');
   };
-  
-  const closeDocumentModal = () => {
-    setShowDocumentModal(false);
+
+  const handleRemoveExistingDocument = () => {
+    setFormFields({ ...formFields, physicalFormUrl: '' });
   };
 
   return (
     <PageContainer>
-      <BackButton onClick={handleCancel}>
-        <ArrowIcon /> Add Member
+      <BackButton onClick={handleBack}>
+        <ArrowIcon />
+        Back to Members
       </BackButton>
       
       <FormContainer>
-        <SectionTitle>Basic Details</SectionTitle>
+        <PageTitle>{editMode ? 'Edit Member' : 'Add New Member'}</PageTitle>
+        <ProgressBar>
+          <ProgressBarInner progress={formProgress} />
+        </ProgressBar>
         <Form onSubmit={handleSubmit}>
-        <InputGroup>
-          <FieldLabel>First Name</FieldLabel>
-          <Input
-            type="text"
-            required
-            name="firstName"
-            value={firstName}
-            onChange={handleChange}
-            placeholder="Enter first name"
-          />
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Last Name</FieldLabel>
-          <Input
-            type="text"
-            required
-            name="lastName"
-            value={lastName}
-            onChange={handleChange}
-            placeholder="Enter last name"
-          />
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Email</FieldLabel>
-          <Input
-            type="email"
-            required
-            name="email"
-            value={email}
-            onChange={handleChange}
-            placeholder="example@gmail.com"
-          />
-        </InputGroup>
-          
-        <SectionTitle>Address</SectionTitle>
-        
-        <InputGroup>
-          <FieldLabel>Address Line 1</FieldLabel>
-          <Input
-            type="text"
-            required
-            name="addressLine1"
-            value={addressLine1}
-            onChange={handleChange}
-            placeholder="Door No, Apartment, Building, Floor etc."
-          />
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Address Line 2</FieldLabel>
-          <Input
-            type="text"
-            name="addressLine2"
-            value={addressLine2}
-            onChange={handleChange}
-            placeholder="Street address"
-          />
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Country</FieldLabel>
-          <Select
-            required
-            name="country"
-            value={country}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            <option value="United Kingdom">United Kingdom</option>
-            <option value="United States">United States</option>
-            <option value="Canada">Canada</option>
-            <option value="Australia">Australia</option>
-          </Select>
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>State/Province</FieldLabel>
-          <Select
-            name="county"
-            value={county}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            <option value="London">London</option>
-            <option value="Manchester">Manchester</option>
-            <option value="Birmingham">Birmingham</option>
-            <option value="Liverpool">Liverpool</option>
-          </Select>
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>City</FieldLabel>
-          <Select
-            required
-            name="city"
-            value={city}
-            onChange={handleChange}
-          >
-            <option value="">Select</option>
-            <option value="London">London</option>
-            <option value="Manchester">Manchester</option>
-            <option value="Birmingham">Birmingham</option>
-            <option value="Liverpool">Liverpool</option>
-          </Select>
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Postal Code</FieldLabel>
-          <Input
-            type="text"
-            required
-            name="postalCode"
-            value={postalCode}
-            onChange={handleChange}
-            placeholder="Enter Code"
-          />
-        </InputGroup>
-        <SectionTitle>Other Details</SectionTitle>
-        
-        <InputGroup>
-          <FieldLabel>Mobile Number</FieldLabel>
-          <Input
-            type="tel"
-            required
-            name="phone"
-            value={phone}
-            onChange={handleChange}
-            placeholder="Enter Mobile Number"
-          />
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Date of Birth</FieldLabel>
-          <Input
-            type="date"
-            required
-            name="dateOfBirth"
-            value={dateOfBirth}
-            onChange={handleChange}
-          />
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Branch</FieldLabel>
-          <Select
-            required
-            name="branchId"
-            value={branchId}
-            onChange={handleChange}
-            disabled={branchesLoading}
-          >
-            <option value="">Select</option>
-            {branches.map(branch => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </Select>
-        </InputGroup>
-        
-        <InputGroup>
-          <FieldLabel>Joined On</FieldLabel>
-          <Input
-            type="date"
-            required
-            name="joinedOn"
-            value={joinedOn}
-            onChange={handleChange}
-          />
-        </InputGroup>
-        
-        <SectionTitle>Physical Form Document</SectionTitle>
-        
-        <InputGroup style={{ gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px' }}>
-            {downloadURL ? (
-              <DocumentUploadContainer onClick={openDocumentModal}>
-                <DocumentPreview>
-                  <DocumentIconSvg />
-                  <span>View Document</span>
-                </DocumentPreview>
-              </DocumentUploadContainer>
-            ) : (
-              <DocumentUploadContainer onClick={() => document.getElementById('documentUpload').click()}>
-                <UploadIcon>
-                  <UploadIconSvg />
-                  <span>Upload Document</span>
-                </UploadIcon>
-              </DocumentUploadContainer>
-            )}
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <input 
-                id="documentUpload"
-                type="file" 
-                accept="application/pdf" 
-                name="physicalForm" 
-                onChange={handleFileChange} 
-                style={{ display: 'none' }}
+          <SectionTitle>Personal Information</SectionTitle>
+          <FormSection>
+            <FormRow>
+              <FormInput
+                label="First Name"
+                type="text"
+                required
+                name="firstName"
+                value={formFields.firstName}
+                onChange={handleChange}
+                placeholder="Enter first name"
               />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="Last Name"
+                type="text"
+                required
+                name="lastName"
+                value={formFields.lastName}
+                onChange={handleChange}
+                placeholder="Enter last name"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="Email"
+                type="email"
+                name="email"
+                value={formFields.email}
+                onChange={handleChange}
+                placeholder="Enter email address"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="Phone"
+                type="tel"
+                name="phone"
+                value={formFields.phone}
+                onChange={handleChange}
+                placeholder="Enter phone number"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="Date of Birth"
+                type="date"
+                name="dateOfBirth"
+                required
+                value={formFields.dateOfBirth}
+                onChange={handleChange}
+                placeholder="Select date of birth"
+              />
+            </FormRow>
+          </FormSection>
+          
+          <SectionTitle>Address Information</SectionTitle>
+          <FormSection>
+            <FormRow fullWidth>
+              <FormInput
+                label="Address Line 1"
+                type="text"
+                required
+                name="addressLine1"
+                value={formFields.addressLine1}
+                onChange={handleChange}
+                placeholder="Enter street address"
+              />
+            </FormRow>
+            
+            <FormRow fullWidth>
+              <FormInput
+                label="Address Line 2"
+                type="text"
+                name="addressLine2"
+                value={formFields.addressLine2}
+                onChange={handleChange}
+                placeholder="Apartment, suite, unit, etc. (optional)"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="City"
+                type="text"
+                required
+                name="city"
+                value={formFields.city}
+                onChange={handleChange}
+                placeholder="Enter city"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="County"
+                type="text"
+                name="county"
+                value={formFields.county}
+                onChange={handleChange}
+                placeholder="Enter county (optional)"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="Postal Code"
+                type="text"
+                required
+                name="postalCode"
+                value={formFields.postalCode}
+                onChange={handleChange}
+                placeholder="Enter postal code"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <FormSelect
+                label="Country"
+                required
+                name="country"
+                value={formFields.country}
+                onChange={handleChange}
+              >
+                <option value="">Select country</option>
+                <option value="United Kingdom">United Kingdom</option>
+                <option value="United States">United States</option>
+                <option value="Canada">Canada</option>
+                <option value="Australia">Australia</option>
+                <option value="Other">Other</option>
+              </FormSelect>
+            </FormRow>
+          </FormSection>
+          
+          <SectionTitle>Church Information</SectionTitle>
+          <FormSection>
+            <FormRow>
+              <FormSelect
+                label="Branch"
+                required
+                name="branchId"
+                value={formFields.branchId}
+                onChange={handleChange}
+              >
+                <option value="">Select branch</option>
+                {branches?.map(branch => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormRow>
+            
+            <FormRow>
+              <FormInput
+                label="Joined On"
+                type="date"
+                name="joinedOn"
+                required
+                value={formFields.joinedOn}
+                onChange={handleChange}
+                placeholder="Select join date"
+              />
+            </FormRow>
+            
+            <FormRow>
+              <CheckboxContainer>
+                <Checkbox
+                  type="checkbox"
+                  name="baptised"
+                  checked={formFields.baptised}
+                  onChange={handleCheckboxChange}
+                />
+                <CheckboxLabel>Baptised</CheckboxLabel>
+              </CheckboxContainer>
+            </FormRow>
+          </FormSection>
+          
+          <SectionTitle>Physical Form</SectionTitle>
+          <FormSection>
+            <FormRow fullWidth>
+              <UploadContainer>
+                <UploadLabel htmlFor="document-upload">
+                  <UploadIconSvg />
+                  <span>Upload Physical Form</span>
+                </UploadLabel>
+                <UploadInput
+                  id="document-upload"
+                  type="file"
+                  onChange={handleFileChange}
+                />
+              </UploadContainer>
               
-              {!downloadURL && (
-                <>
-                  <Button 
-                    type="button" 
-                    onClick={() => document.getElementById('documentUpload').click()}
-                  >
-                    Select Document
-                  </Button>
-                  <UploadText>
-                    Supported format: PDF
-                  </UploadText>
-                </>
+              {selectedFiles.length > 0 && (
+                <SelectedFilesContainer>
+                  <SelectedFilesTitle>Selected File:</SelectedFilesTitle>
+                  <FileList>
+                    <FileItem>
+                      <FileName>{selectedFiles[0].name}</FileName>
+                      <RemoveFileButton onClick={() => handleRemoveFile(0)}>
+                        &times;
+                      </RemoveFileButton>
+                    </FileItem>
+                  </FileList>
+                </SelectedFilesContainer>
               )}
               
-              {file && !downloadURL && (
-                <Button 
-                  type="button" 
-                  onClick={handleFileUpload} 
-                  disabled={uploading}
-                >
-                  {uploading ? 'Uploading...' : 'Upload Document'}
-                </Button>
+              {formFields.physicalFormUrl && (
+                <ExistingDocumentsContainer>
+                  <ExistingDocumentsTitle>Existing Physical Form:</ExistingDocumentsTitle>
+                  <FileList>
+                    <FileItem>
+                      <FileName>Physical Form</FileName>
+                      <DocumentActions>
+                        <ViewDocumentButton onClick={() => handleViewDocument({ name: 'Physical Form', url: formFields.physicalFormUrl })}>
+                          <DocumentIconSvg />
+                          View
+                        </ViewDocumentButton>
+                        <RemoveFileButton onClick={() => handleRemoveExistingDocument()}>
+                          &times;
+                        </RemoveFileButton>
+                      </DocumentActions>
+                    </FileItem>
+                  </FileList>
+                </ExistingDocumentsContainer>
               )}
-              
-              {downloadURL && (
-                <div>
-                  <Button 
-                    type="button" 
-                    onClick={openDocumentModal}
-                  >
-                    View Document
-                  </Button>
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
-                    Click to view the uploaded document
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </InputGroup>
+            </FormRow>
+          </FormSection>
+          <ButtonContainer>
+            <Button type="button" onClick={handleBack} buttonType="inverted">
+              Cancel
+            </Button>
+            <Button type="submit">
+              {editMode ? 'Update Member' : 'Save Member'}
+            </Button>
+          </ButtonContainer>
+        </Form>
         
-        {showDocumentModal && (
-          <ModalOverlay onClick={closeDocumentModal}>
+        {isPreviewModalOpen && (
+          <ModalOverlay onClick={() => setIsPreviewModalOpen(false)}>
             <ModalContent onClick={e => e.stopPropagation()}>
-              <CloseButton onClick={closeDocumentModal}>×</CloseButton>
-              <DocumentFrame src={downloadURL} title="Physical Form Document" />
+              <CloseButton onClick={() => setIsPreviewModalOpen(false)}>×</CloseButton>
+              <h3>{typeof previewDocumentName === 'string' ? previewDocumentName : 'Physical Form'}</h3>
+              
+              <ModalMessage>
+                Click the button below to view the document in a new tab
+              </ModalMessage>
+              
+              <DocumentViewButton 
+                href={typeof previewUrl === 'string' ? previewUrl : Array.isArray(previewUrl) && previewUrl.length > 0 ? previewUrl[0] : ''}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View Document
+              </DocumentViewButton>
             </ModalContent>
           </ModalOverlay>
         )}
-        <ButtonContainer>
-          <Button type="button" onClick={handleCancel}>Cancel</Button>
-          <Button type="submit">{editMode ? 'Update Member' : 'Add Member'}</Button>
-        </ButtonContainer>
-      </Form>
-    </FormContainer>
-  </PageContainer>
+      </FormContainer>
+    </PageContainer>
   );
 };
 
